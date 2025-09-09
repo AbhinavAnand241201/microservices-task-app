@@ -3,61 +3,65 @@
 version: '3.8'
 
 services:
-  # Define the User Service
+  # NEW: API Gateway - The single entry point
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8000:8000" # This is the ONLY port exposed to the outside world
+    networks:
+      - my-network
+    depends_on:
+      - user-service
+      - task-service
+
+  # User Service - Now internal only
   user-service:
     build: ./user-service
-    ports:
-      - "3001:3001"
+    # NO ports exposed. It's only accessible via the gateway.
     networks:
       - my-network
     depends_on:
       - mongodb
       - rabbitmq
 
-  # Define the Task Service
+  # Task Service - Now internal only
   task-service:
     build: ./task-service
-    ports:
-      - "3002:3002"
+    # NO ports exposed.
     networks:
       - my-network
     depends_on:
       - mongodb
-      - rabbitmq
-  
-  # Define the Notification Service
+
+  # Notification Service - No changes needed here, but we remove the port for consistency
   notification-service:
     build: ./notification-service
-    ports:
-      - "3003:3003"
     networks:
       - my-network
     depends_on:
       - rabbitmq
 
-  # Define the RabbitMQ service
+  # RabbitMQ Service - No changes
   rabbitmq:
     image: "rabbitmq:3.8-management"
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "15672:15672" # We keep this for the management UI
     volumes:
       - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
       - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
     networks:
       - my-network
 
-  # Define the MongoDB service
+  # MongoDB Service - No changes
   mongodb:
     image: mongo
     ports:
-      - "27017:27017"
+      - "27017:27017" # We keep this for local DB tools if needed
     volumes:
       - ~/.docker-conf/mongodb/data/:/data/db
     networks:
       - my-network
 
-# Define the networks
 networks:
   my-network:
     driver: bridge
