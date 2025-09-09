@@ -1,0 +1,63 @@
+# File: nodejs-microservices/docker-compose.yml
+
+version: '3.8'
+
+services:
+  # Define the User Service
+  user-service:
+    build: ./user-service
+    ports:
+      - "3001:3001"
+    networks:
+      - my-network
+    depends_on:
+      - mongodb
+      - rabbitmq
+
+  # Define the Task Service
+  task-service:
+    build: ./task-service
+    ports:
+      - "3002:3002"
+    networks:
+      - my-network
+    depends_on:
+      - mongodb
+      - rabbitmq
+  
+  # Define the Notification Service
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "3003:3003"
+    networks:
+      - my-network
+    depends_on:
+      - rabbitmq
+
+  # Define the RabbitMQ service
+  rabbitmq:
+    image: "rabbitmq:3.8-management"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
+      - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+    networks:
+      - my-network
+
+  # Define the MongoDB service
+  mongodb:
+    image: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - ~/.docker-conf/mongodb/data/:/data/db
+    networks:
+      - my-network
+
+# Define the networks
+networks:
+  my-network:
+    driver: bridge
