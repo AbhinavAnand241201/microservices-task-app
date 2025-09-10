@@ -1,4 +1,4 @@
-// File: task-service/index.js
+require('dotenv').config(); // This must be the very first line
 
 const express = require("express");
 const mongoose = require("mongoose");
@@ -7,13 +7,15 @@ const jwt = require("jsonwebtoken");
 const Task = require("./models/Task");
 
 const app = express();
-const PORT = process.env.PORT || 3002;
-const JWT_SECRET = "your_super_super_secret_key_that_is_very_long_and_secure";
+// Use variables from process.env, read from the .env file
+const PORT = process.env.PORT;
+const JWT_SECRET = process.env.JWT_SECRET;
+const MONGO_URI = process.env.MONGO_URI;
 
 app.use(bodyParser.json());
 
 // --- MongoDB Connection ---
-mongoose.connect("mongodb://mongodb/task-service-db", {
+mongoose.connect(MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 }).then(() => {

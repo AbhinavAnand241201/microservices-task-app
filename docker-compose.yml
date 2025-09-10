@@ -1,39 +1,33 @@
-# File: nodejs-microservices/docker-compose.yml
-
-version: '3.8'
-
 services:
-  # NEW: API Gateway - The single entry point
   api-gateway:
     build: ./api-gateway
     ports:
-      - "8000:8000" # This is the ONLY port exposed to the outside world
+      - "8000:8000"
     networks:
       - my-network
     depends_on:
       - user-service
       - task-service
 
-  # User Service - Now internal only
   user-service:
     build: ./user-service
-    # NO ports exposed. It's only accessible via the gateway.
+    env_file:
+      - user-service/.env
     networks:
       - my-network
     depends_on:
       - mongodb
       - rabbitmq
 
-  # Task Service - Now internal only
   task-service:
     build: ./task-service
-    # NO ports exposed.
+    env_file:
+      - task-service/.env
     networks:
       - my-network
     depends_on:
       - mongodb
 
-  # Notification Service - No changes needed here, but we remove the port for consistency
   notification-service:
     build: ./notification-service
     networks:
@@ -41,22 +35,20 @@ services:
     depends_on:
       - rabbitmq
 
-  # RabbitMQ Service - No changes
   rabbitmq:
     image: "rabbitmq:3.8-management"
     ports:
-      - "15672:15672" # We keep this for the management UI
+      - "15672:15672"
     volumes:
       - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
       - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
     networks:
       - my-network
 
-  # MongoDB Service - No changes
   mongodb:
     image: mongo
     ports:
-      - "27017:27017" # We keep this for local DB tools if needed
+      - "27017:27017"
     volumes:
       - ~/.docker-conf/mongodb/data/:/data/db
     networks:

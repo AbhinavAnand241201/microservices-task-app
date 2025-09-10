@@ -1,48 +1,44 @@
-// File: user-service/index.js
+require('dotenv').config();
 
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
-const User = require("./models/user"); // This line needs the User.js model file
+const User = require("./models/user"); // Correct capitalization
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const amqp = require("amqplib");
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-const JWT_SECRET = "your_super_super_secret_key_that_is_very_long_and_secure";
+const PORT = process.env.PORT;
+const JWT_SECRET = process.env.JWT_SECRET;
+const MONGO_URI = process.env.MONGO_URI;
 
 app.use(bodyParser.json());
 
-// --- RabbitMQ Connection ---
-const RABBITMQ_URL = "amqp://rabbitmq:5672";
-let channel, connection;
-
+// --- RabbitMQ & MongoDB Connections ---
 async function connectToRabbitMQ() {
     try {
-        connection = await amqp.connect(RABBITMQ_URL);
+        const connection = await amqp.connect("amqp://rabbitmq:5672");
         channel = await connection.createChannel();
         await channel.assertQueue("user-created");
         console.log("User-Service connected to RabbitMQ.");
     } catch (error) {
         console.error("Error connecting to RabbitMQ:", error);
-        setTimeout(connectToRabbitMQ, 5000); // Retry connection
+        setTimeout(connectToRabbitMQ, 5000);
     }
 }
 connectToRabbitMQ();
 
-// --- MongoDB Connection ---
-mongoose.connect("mongodb://mongodb/user-service-db", {
+mongoose.connect(MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 }).then(() => {
     console.log("User-Service DB Connected");
-}).catch(err => {
-    console.error("DB Connection Error:", err);
-});
+}).catch(err => console.error("DB Connection Error:", err));
 
 
 // --- API Endpoints ---
+
 app.post("/register", async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -50,20 +46,15 @@ app.post("/register", async (req, res) => {
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
         }
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash( password, 10);
         const newUser = new User({ name, email, password: hashedPassword });
         await newUser.save();
-        
-        // Sanitize the event message to not include the password
-        const userEventData = { id: newUser._id, email: newUser.email, name: newUser.name };
 
+        const userEventData = { id: newUser._id, email: newUser.email, name: newUser.name };
         if (channel) {
             channel.sendToQueue("user-created", Buffer.from(JSON.stringify(userEventData)));
-        } else {
-            console.log("RabbitMQ channel not available. Message not sent.");
         }
-        
-        // Sanitize the API response
+
         const userResponse = { _id: newUser._id, name: newUser.name, email: newUser.email, created_at: newUser.created_at };
         res.status(201).json({ message: "User created successfully", user: userResponse });
     } catch (error) {
@@ -85,17 +76,28 @@ app.post("/login", async (req, res) => {
         }
         const payload = { id: user._id, email: user.email };
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
-
         res.json({ message: "Logged in successfully", token });
-
     } catch (error) {
         console.error("Login Error:", error);
         res.status(500).json({ message: "Server error" });
     }
 });
 
+// Internal endpoint for the API Gateway to look up user data
+app.get('/users/:id', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        const { name, email, _id } = user;
+        res.json({ name, email, _id });
+    } catch (error) {
+        console.error("User lookup error:", error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`User-Service listening on port ${PORT}`);
 });
-
